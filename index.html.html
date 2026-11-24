@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mô hình bơm bóng 3D – Khí lí tưởng</title>
+<style>
+:root{--bg:#f4f6fa;--panel:#ffffff;--tx:#1b2430;--mut:#5d6b7c;--ac:#2563eb;--bd:#dde3ec;--warn:#dc2626;--ok:#16a34a;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f141b;--panel:#18202b;--tx:#e8edf3;--mut:#93a1b3;--ac:#60a5fa;--bd:#2a3544;--warn:#f87171;--ok:#4ade80;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f141b;--panel:#18202b;--tx:#e8edf3;--mut:#93a1b3;--ac:#60a5fa;--bd:#2a3544;--warn:#f87171;--ok:#4ade80;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px}
+.app{display:grid;grid-template-columns:1fr 340px;height:100%}
+#view{position:relative;min-height:300px;touch-action:none;cursor:grab}
+#view canvas{display:block;width:100%;height:100%}
+.hint{position:absolute;left:12px;bottom:10px;color:var(--mut);font-size:12px}
+#msg{position:absolute;top:12px;left:50%;transform:translateX(-50%);padding:8px 14px;border-radius:8px;background:var(--warn);color:#fff;font-weight:600;display:none;text-align:center}
+.panel{background:var(--panel);border-left:1px solid var(--bd);padding:14px;overflow-y:auto}
+h1{font-size:16px;margin:0 0 4px}
+.sub{color:var(--mut);font-size:12px;margin-bottom:10px}
+.eq{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:8px;text-align:center;font-size:15px;margin-bottom:12px}
+.row{margin:9px 0}
+.row label{display:flex;justify-content:space-between;color:var(--mut);margin-bottom:2px}
+.row b{color:var(--tx)}
+input[type=range]{width:100%;accent-color:var(--ac)}
+.btns{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+button{flex:1;min-width:70px;padding:9px 8px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font-size:13px;cursor:pointer}
+button.p{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:600}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:7px 9px}
+.card span{display:block;color:var(--mut);font-size:11px}
+.card b{font-size:15px}
+.bar{height:8px;background:var(--bg);border:1px solid var(--bd);border-radius:6px;overflow:hidden;margin:8px 0 2px}
+#barf{height:100%;width:0;background:var(--ok);transition:background .2s}
+.note{color:var(--mut);font-size:12px;line-height:1.5;margin-top:10px}
+@media (max-width:760px){.app{grid-template-columns:1fr;grid-template-rows:42vh auto;height:auto;min-height:100%}.panel{border-left:0;border-top:1px solid var(--bd)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="view"><div id="msg"></div><div class="hint">Kéo chuột/ngón tay để xoay mô hình · cuộn để thu phóng</div></div>
+  <div class="panel">
+    <h1>Mô hình bơm bóng 3D</h1>
+    <div class="sub">Vật lí 12 – Khí lí tưởng: định luật Boyle, Charles, Gay-Lussac</div>
+    <div class="eq">p · V = n · R · T</div>
+
+    <div class="row"><label>Thể tích bóng V <b id="oV"></b></label><input id="Vb" type="range" min="1" max="10" step="0.5" value="5"></div>
+    <div class="row"><label>Thể tích mỗi lần bơm V₀ <b id="oV0"></b></label><input id="V0" type="range" min="50" max="500" step="10" value="200"></div>
+    <div class="row"><label>Nhiệt độ khí T <b id="oT"></b></label><input id="T" type="range" min="0" max="80" step="1" value="27"></div>
+    <div class="row"><label>Áp suất khí quyển p₀ <b id="op0"></b></label><input id="p0" type="range" min="80" max="110" step="0.5" value="101.3"></div>
+    <div class="row"><label>Áp suất tối đa bóng chịu được <b id="opm"></b></label><input id="pm" type="range" min="150" max="500" step="10" value="350"></div>
+
+    <div class="btns">
+      <button class="p" id="bPump">Bơm 1 lần</button>
+      <button id="bAuto">Tự động bơm</button>
+      <button id="bVent">Xả khí</button>
+      <button id="bReset">Đặt lại</button>
+    </div>
+
+    <div class="bar"><div id="barf"></div></div>
+    <div class="sub" id="barl"></div>
+
+    <div class="grid">
+      <div class="card"><span>Áp suất p</span><b id="rp"></b></div>
+      <div class="card"><span>Số mol khí n</span><b id="rn"></b></div>
+      <div class="card"><span>Số lần bơm</span><b id="rN"></b></div>
+      <div class="card"><span>Nhiệt độ tuyệt đối</span><b id="rT"></b></div>
+      <div class="card"><span>Δn mỗi lần bơm</span><b id="rdn"></b></div>
+      <div class="card"><span>Kiểm tra p·V</span><b id="rpv"></b></div>
+    </div>
+    <div class="note">
+      • Mỗi lần bơm đưa thêm Δn = p₀V₀/(RT) mol khí vào bóng.<br>
+      • Giữ n, T không đổi, giảm V thì p tăng (Boyle).<br>
+      • Giữ n, V không đổi, tăng T thì p tăng tỉ lệ với T (Gay-Lussac).<br>
+      • Các chấm trong bóng là phân tử khí: càng nhiều thì áp suất càng lớn, càng nóng thì chuyển động càng nhanh.
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+var Rg=8.314, $=function(i){return document.getElementById(i)};
+var S={Vb:5,V0:200,T:27,p0:101.3,pm:350,N:0,n:0,burst:false,auto:null};
+function Tk(){return S.T+273.15}
+function nEq(){return S.p0*1000*(S.Vb/1000)/(Rg*Tk())}
+function press(){return S.n*Rg*Tk()/(S.Vb/1000)/1000}
+function dn(){return S.p0*1000*(S.V0/1e6)/(Rg*Tk())}
+S.n=nEq();
+
+/* ---------- 3D ---------- */
+var view=$('view'), W=1,H=1;
+var renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+view.appendChild(renderer.domElement);
+var scene=new THREE.Scene();
+var camera=new THREE.PerspectiveCamera(42,1,0.1,100);
+scene.add(new THREE.AmbientLight(0xffffff,0.65));
+var dl=new THREE.DirectionalLight(0xffffff,0.8);dl.position.set(4,6,6);scene.add(dl);
+var root=new THREE.Group();scene.add(root);
+root.rotation.y=-0.35;root.rotation.x=0.1;
+
+var floor=new THREE.Mesh(new THREE.CircleGeometry(5.5,48),new THREE.MeshBasicMaterial({color:0x8899aa,transparent:true,opacity:0.15}));
+floor.rotation.x=-Math.PI/2;floor.position.y=-2.4;root.add(floor);
+
+/* pump */
+var PX=-3.4, glass=new THREE.MeshPhongMaterial({color:0x9ec5ff,transparent:true,opacity:0.28,side:THREE.DoubleSide});
+var cyl=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.55,3.2,32,1,true),glass);cyl.position.set(PX,0,0);root.add(cyl);
+var base=new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,0.15,32),new THREE.MeshPhongMaterial({color:0x445566}));base.position.set(PX,-1.65,0);root.add(base);
+var piston=new THREE.Group();root.add(piston);
+piston.add(new THREE.Mesh(new THREE.CylinderGeometry(0.53,0.53,0.22,32),new THREE.MeshPhongMaterial({color:0x222b36})));
+var rod=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,2.4,12),new THREE.MeshPhongMaterial({color:0xaab4c0}));rod.position.y=1.2;piston.add(rod);
+var handle=new THREE.Mesh(new THREE.BoxGeometry(1.1,0.18,0.3),new THREE.MeshPhongMaterial({color:0xe11d48}));handle.position.y=2.45;piston.add(handle);
+var airIn=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,1,24),new THREE.MeshBasicMaterial({color:0x60a5fa,transparent:true,opacity:0.25}));root.add(airIn);
+
+/* hose */
+var BX=1.8, BY0=-2.0;
+var curve=new THREE.CatmullRomCurve3([new THREE.Vector3(PX,-1.7,0),new THREE.Vector3(PX,-2.2,0),new THREE.Vector3(PX+1.2,-2.3,0),new THREE.Vector3(BX-1,-2.3,0),new THREE.Vector3(BX,BY0,0)]);
+root.add(new THREE.Mesh(new THREE.TubeGeometry(curve,40,0.07,10,false),new THREE.MeshPhongMaterial({color:0x2f3a46})));
+
+/* ball */
+var ballG=new THREE.Group();root.add(ballG);
+var ballMat=new THREE.MeshPhongMaterial({color:0x3b82f6,transparent:true,opacity:0.3,shininess:90});
+var ball=new THREE.Mesh(new THREE.SphereGeometry(1,40,28),ballMat);ballG.add(ball);
+var MAXP=700, pos=new Float32Array(MAXP*3), vel=[];
+for(var i=0;i<MAXP;i++){
+  var v=new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize().multiplyScalar(Math.random()*.9);
+  pos[i*3]=v.x;pos[i*3+1]=v.y;pos[i*3+2]=v.z;
+  vel.push(new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize());
+}
+var pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+var pts=new THREE.Points(pg,new THREE.PointsMaterial({color:0xffffff,size:0.05,sizeAttenuation:true}));
+pts.frustumCulled=false;ballG.add(pts);
+
+function rad(){return 1.25*Math.pow(S.Vb/5,1/3)}
+
+/* rotate / zoom */
+var drag=false,lx=0,ly=0,zoom=1;
+view.addEventListener('pointerdown',function(e){drag=true;lx=e.clientX;ly=e.clientY;view.style.cursor='grabbing'});
+window.addEventListener('pointerup',function(){drag=false;view.style.cursor='grab'});
+window.addEventListener('pointermove',function(e){if(!drag)return;root.rotation.y+=(e.clientX-lx)*0.008;root.rotation.x=Math.max(-0.9,Math.min(0.9,root.rotation.x+(e.clientY-ly)*0.006));lx=e.clientX;ly=e.clientY});
+view.addEventListener('wheel',function(e){e.preventDefault();zoom=Math.max(.6,Math.min(1.8,zoom*(e.deltaY>0?1.07:.93)))},{passive:false});
+
+function resize(){
+  W=view.clientWidth;H=view.clientHeight;if(!W||!H)return;
+  renderer.setSize(W,H);camera.aspect=W/H;camera.updateProjectionMatrix();
+}
+window.addEventListener('resize',resize);
+
+/* pump animation */
+var anim=-1;
+function doPump(){
+  if(S.burst||anim>=0)return;
+  anim=0;
+}
+function applyPump(){
+  S.n+=dn();S.N++;
+  if(press()>S.pm){S.burst=true;stopAuto()}
+}
+
+/* ---------- UI ---------- */
+function ui(){
+  var p=press(), Tkk=Tk();
+  $('oV').textContent=S.Vb+' L';$('oV0').textContent=S.V0+' mL';$('oT').textContent=S.T+' °C';
+  $('op0').textContent=S.p0+' kPa';$('opm').textContent=S.pm+' kPa';
+  $('rp').textContent=p.toFixed(1)+' kPa ('+(p/101.325).toFixed(2)+' atm)';
+  $('rn').textContent=S.n.toFixed(4)+' mol';
+  $('rN').textContent=S.N;
+  $('rT').textContent=Tkk.toFixed(1)+' K';
+  $('rdn').textContent=(dn()*1000).toFixed(2)+' mmol';
+  $('rpv').textContent=(p*S.Vb).toFixed(0)+' J';
+  var f=Math.min(1,p/S.pm);
+  $('barf').style.width=(f*100)+'%';
+  $('barf').style.background=f>0.85?'var(--warn)':f>0.6?'#f59e0b':'var(--ok)';
+  $('barl').textContent='p / p tối đa = '+(f*100).toFixed(0)+'%';
+  var m=$('msg');
+  if(S.burst){m.style.display='block';m.textContent='Bóng đã nổ! Áp suất vượt giới hạn. Nhấn "Đặt lại".'}
+  else m.style.display='none';
+}
+function reset(){stopAuto();S.N=0;S.burst=false;S.n=nEq();ui()}
+function stopAuto(){if(S.auto){clearInterval(S.auto);S.auto=null;$('bAuto').textContent='Tự động bơm'}}
+
+[['Vb','Vb'],['V0','V0'],['T','T'],['p0','p0'],['pm','pm']].forEach(function(a){
+  $(a[0]).addEventListener('input',function(e){
+    var v=parseFloat(e.target.value);
+    if(a[1]==='p0'){ /* đổi p0: giữ n tương đối với trạng thái cân bằng ban đầu khi chưa bơm */
+      var ratio=S.N===0?1:0;S.p0=v;if(ratio){S.n=nEq()}
+    } else S[a[1]]=v;
+    if(a[1]==='Vb'&&S.N===0){/* chưa bơm: bóng vẫn chứa khí ở p0 */ S.n=S.n} 
+    if(S.burst&&press()<=S.pm)S.burst=false;
+    ui();
+  });
+});
+$('bPump').onclick=doPump;
+$('bAuto').onclick=function(){
+  if(S.auto){stopAuto();return}
+  $('bAuto').textContent='Dừng bơm';
+  S.auto=setInterval(doPump,900);
+};
+$('bVent').onclick=function(){
+  var neq=nEq();S.n=Math.max(neq,S.n*0.85);S.burst=false;ui();
+};
+$('bReset').onclick=reset;
+
+/* ---------- loop ---------- */
+var last=performance.now(),tmp=new THREE.Vector3();
+function frame(t){
+  requestAnimationFrame(frame);
+  var dt=Math.min(0.05,(t-last)/1000);last=t;
+  if(!W||!H)resize();
+  var aspect=W/H;
+  camera.position.set(0,0.4,(aspect<0.9?15:10.5)/zoom*(aspect<0.9?1:1));
+  camera.lookAt(-0.6,-0.3,0);
+
+  /* piston animation: 0 → 1 xuống, rồi lên */
+  var top=1.3,bot=-1.1,py=top;
+  if(anim>=0){
+    anim+=dt/0.9;
+    var k=anim<0.5?anim/0.5:1-(anim-0.5)/0.5;
+    py=top+(bot-top)*Math.sin(k*Math.PI/2);
+    if(anim>=0.5&&!(S._done)){S._done=true;applyPump();}
+    if(anim>=1){anim=-1;S._done=false;py=top}
+  }
+  piston.position.set(PX,py,0);
+  airIn.scale.y=Math.max(0.05,py-(-1.55));airIn.position.set(PX,-1.55+airIn.scale.y/2,0);
+
+  var r=rad(), p=press(), f=Math.min(1,p/S.pm);
+  ballG.position.set(BX,BY0+r,0);
+  var inflate=1+0.06*f*(S.burst?0:1);
+  ballG.scale.setScalar(S.burst?0.001:r*inflate);
+  ballMat.color.setRGB(0.23+0.7*f,0.51-0.4*f,0.96-0.8*f);
+  ballMat.opacity=0.22+0.25*f;
+
+  var cnt=Math.min(MAXP,Math.round(S.n*500));
+  pg.setDrawRange(0,cnt);
+  var sp=0.9*Math.sqrt(Tk()/300), arr=pg.attributes.position.array;
+  for(var i=0;i<cnt;i++){
+    var v=vel[i];
+    arr[i*3]+=v.x*sp*dt;arr[i*3+1]+=v.y*sp*dt;arr[i*3+2]+=v.z*sp*dt;
+    tmp.set(arr[i*3],arr[i*3+1],arr[i*3+2]);
+    var L=tmp.length();
+    if(L>0.97){tmp.divideScalar(L);var d=v.dot(tmp);if(d>0){v.addScaledVector(tmp,-2*d)}
+      arr[i*3]=tmp.x*0.96;arr[i*3+1]=tmp.y*0.96;arr[i*3+2]=tmp.z*0.96}
+  }
+  pg.attributes.position.needsUpdate=true;
+  pts.material.color.setRGB(1,1-0.6*f,1-0.6*f);
+  pts.visible=!S.burst;
+  ui_lite();
+  renderer.render(scene,camera);
+}
+var uiTick=0;function ui_lite(){if(++uiTick%6===0)ui()}
+resize();ui();requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
